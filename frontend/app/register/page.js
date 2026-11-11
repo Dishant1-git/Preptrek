@@ -8,7 +8,7 @@ import { EXAMS } from "@/lib/exams";
 
 export default function Register() {
   const [form, setForm] = useState({
-    name: "", email: "", domain: "", gender: "", phone: "", password: "", confirmPassword: "",
+    name: "", email: "", domain: "", gender: "", password: "", confirmPassword: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,11 +69,6 @@ export default function Register() {
               <option value="other">Other</option>
             </select>
           </div>
-        </div>
-
-        <div>
-          <label>Phone number</label>
-          <input type="tel" required value={form.phone} onChange={set("phone")} placeholder="+91 98765 43210" />
         </div>
 
         <div className="row-2">

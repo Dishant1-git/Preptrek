@@ -15,7 +15,6 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     domain: { type: String, required: true }, // e.g. JEE, NEET, UPSC, Web Development
     gender: { type: String, enum: ["male", "female", "other"], required: true },
-    phone: { type: String, required: true },
     password: { type: String, required: true },
     dashboard: {
       type: [{ _id: false, key: String, title: String, chart: String, visible: Boolean }],

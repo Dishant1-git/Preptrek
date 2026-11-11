@@ -7,9 +7,9 @@ const auth = require("../middleware/auth");
 const makeToken = (user) => jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
 router.post("/register", async (req, res) => {
-  const { name, email, domain, gender, phone, password, confirmPassword } = req.body;
+  const { name, email, domain, gender, password, confirmPassword } = req.body;
 
-  if (!name || !email || !domain || !gender || !phone || !password) {
+  if (!name || !email || !domain || !gender || !password) {
     return res.status(400).json({ message: "Please fill in all fields" });
   }
   if (password.length < 6) {
@@ -18,15 +18,12 @@ router.post("/register", async (req, res) => {
   if (password !== confirmPassword) {
     return res.status(400).json({ message: "Passwords do not match" });
   }
-  if (!/^[0-9+\-\s]{7,15}$/.test(phone)) {
-    return res.status(400).json({ message: "Please enter a valid phone number" });
-  }
   if (await User.findOne({ email: email.toLowerCase() })) {
     return res.status(400).json({ message: "An account with this email already exists" });
   }
 
   const user = await User.create({
-    name, email, domain, gender, phone,
+    name, email, domain, gender,
     password: await bcrypt.hash(password, 10),
   });
 

@@ -18,6 +18,18 @@ app.use(
 );
 app.use(express.json());
 
+// Health check — registered before the DB guard so it always responds
+app.get("/api/health", (req, res) => {
+  const states = ["disconnected", "connected", "connecting", "disconnecting"];
+  const dbConnected = mongoose.connection.readyState === 1;
+  res.status(dbConnected ? 200 : 503).json({
+    status: dbConnected ? "ok" : "degraded",
+    database: states[mongoose.connection.readyState] || "unknown",
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Give a clear message instead of hanging when MongoDB isn't connected
 app.use("/api", (req, res, next) => {
   if (mongoose.connection.readyState !== 1) {
