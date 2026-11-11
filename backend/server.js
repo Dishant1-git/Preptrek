@@ -25,6 +25,7 @@ app.get("/api/health", (req, res) => {
   res.status(dbConnected ? 200 : 503).json({
     status: dbConnected ? "ok" : "degraded",
     database: states[mongoose.connection.readyState] || "unknown",
+    ...(dbConnected ? {} : { error: lastDbError }),
     uptime: Math.round(process.uptime()),
     timestamp: new Date().toISOString(),
   });
@@ -56,7 +57,23 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection failed:", err.message));
+// Connect to MongoDB, retrying every 10s so a temporary failure doesn't leave the API dead
+let lastDbError = null;
+const connectDb = () => {
+  if (!process.env.MONGO_URI) {
+    lastDbError = "MONGO_URI is not set";
+    return console.error("MongoDB connection failed: MONGO_URI is not set");
+  }
+  mongoose
+    .connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 })
+    .then(() => {
+      lastDbError = null;
+      console.log("MongoDB connected");
+    })
+    .catch((err) => {
+      lastDbError = err.message;
+      console.error("MongoDB connection failed:", err.message);
+      setTimeout(connectDb, 10000);
+    });
+};
+connectDb();
