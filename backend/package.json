@@ -1,0 +1,20 @@
+{
+  "name": "preptrek-backend",
+  "version": "1.0.0",
+  "description": "PrepTrek API - by Team Crudify (www.crudify.in)",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "author": "Team Crudify (www.crudify.in)",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.12.1"
+  }
+}
