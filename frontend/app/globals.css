@@ -145,19 +145,29 @@ td { padding: 8px 6px; border-bottom: 1px solid var(--border); }
 .tabs button { border: none; background: transparent; padding: 8px 16px; border-radius: 8px; cursor: pointer; color: var(--purple); font-weight: 600; }
 .tabs button.on { background: var(--white); color: var(--navy); }
 
-/* MCQs */
+/* MCQs & flashcards */
 .tabs { flex-wrap: wrap; }
 .textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font: inherit; resize: vertical; }
-.option-input { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--navy); }
-.option-input input[type="radio"] { width: 18px; height: 18px; accent-color: var(--green); flex-shrink: 0; }
-.option { text-align: left; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--white); cursor: pointer; font-size: 0.95rem; color: var(--text); }
-.option b { color: var(--purple); margin-right: 6px; }
-.option:hover { background: var(--lilac); }
-.option.picked { border-color: var(--purple); background: var(--lilac); }
-.option.right { border-color: var(--green); background: #e3f3ec; }
-.option.right::after { content: "  ✓ Correct answer"; color: var(--green); font-weight: 600; }
-.option.wrong { border-color: var(--red); background: #fbe9ed; }
-.option.wrong::after { content: "  ✗ Your answer"; color: var(--red); font-weight: 600; }
+.btn-green { background: var(--green); }
+.btn-green:hover { background: #34825f; }
+.btn-red { background: var(--red); }
+.btn-red:hover { background: #b1435b; }
+
+/* flashcards */
+.flashcard { width: 100%; max-width: 640px; min-height: 260px; margin: 0 auto; padding: 28px; border-radius: 18px; border: 1px solid var(--border); background: var(--white); cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; align-items: center; gap: 14px; font: inherit; color: var(--text); box-shadow: 0 8px 28px rgba(14, 26, 61, 0.06); }
+.flashcard.flipped { background: var(--lilac); border-color: var(--lavender); }
+.flashcard small { color: var(--muted); }
+.flashcard-text { font-size: 1.3rem; color: var(--navy); white-space: pre-wrap; text-align: center; }
+
+/* timeline */
+.day-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.day-summary .pill { cursor: default; }
+.timeline { list-style: none; display: flex; flex-direction: column; }
+.timeline li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+.timeline li:last-child { border-bottom: none; }
+.timeline time { width: 72px; flex-shrink: 0; color: var(--muted); font-size: 0.8rem; padding-top: 2px; font-variant-numeric: tabular-nums; }
+.timeline-icon { font-size: 1.1rem; }
+.timeline small { display: flex; align-items: center; gap: 5px; color: var(--muted); margin-top: 3px; }
 
 /* badges */
 .badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }

@@ -13,6 +13,8 @@ const links = [
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/trackers", label: "Trackers", icon: "📚" },
   { href: "/mcq", label: "MCQ Practice", icon: "📝" },
+  { href: "/flashcards", label: "Flashcards", icon: "🧠" },
+  { href: "/timeline", label: "Timeline", icon: "🗓️" },
   { href: "/timer", label: "Study Timer", icon: "⏱️" },
   { href: "/targets", label: "Targets", icon: "🎯" },
   { href: "/rewards", label: "Rewards", icon: "🏆" },

@@ -1,213 +1,243 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api, formatDate } from "@/lib/api";
+import { api, formatDateTime, nowLocalInput } from "@/lib/api";
 import { useUser } from "@/components/AppShell";
 import { MARKING, defaultMarking } from "@/lib/exams";
-import McqTest from "@/components/McqTest";
 import Chart from "@/components/Chart";
 
-const LETTERS = ["A", "B", "C", "D"];
-const emptyQuestion = { question: "", options: ["", "", "", ""], answer: "", explanation: "", tracker: "" };
-const shuffle = (list) => [...list].sort(() => Math.random() - 0.5);
+const fmt = (n) => +Number(n || 0).toFixed(2);
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 
 export default function McqPage() {
   const { user } = useUser();
-  const [tab, setTab] = useState("practice");
-  const [mcqs, setMcqs] = useState([]);
+  const [tab, setTab] = useState("log");
   const [trackers, setTrackers] = useState([]);
-  const [results, setResults] = useState(null);
-  const [form, setForm] = useState(emptyQuestion);
-  const [setup, setSetup] = useState({ tracker: "", count: 10, marking: defaultMarking(user.domain) });
-  const [test, setTest] = useState(null); // questions of the running test
+  const [data, setData] = useState(null);
+  const [subject, setSubject] = useState(""); // results filter
+  const emptyForm = () => ({ tracker: "", date: nowLocalInput(), total: "", correct: "", wrong: "", note: "", marking: defaultMarking(user.domain) });
+  const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
+  const [saved, setSaved] = useState("");
 
-  const loadResults = () => api("/mcqs/attempts").then(setResults);
+  const load = () => api("/mcqs").then(setData);
 
   useEffect(() => {
-    api("/mcqs").then(setMcqs);
     api("/trackers").then(setTrackers);
-    loadResults();
+    load();
   }, []);
 
-  // ---- add / delete questions ----
-  const setOption = (i, value) => setForm({ ...form, options: form.options.map((o, idx) => (idx === i ? value : o)) });
+  // Skipped is whatever is left over
+  const total = Number(form.total) || 0;
+  const correct = Number(form.correct) || 0;
+  const wrong = Number(form.wrong) || 0;
+  const skipped = total - correct - wrong;
+  const mark = MARKING[form.marking];
+  const score = correct * mark.correct + wrong * mark.wrong;
 
-  const addQuestion = async (e) => {
+  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+
+  const save = async (e) => {
     e.preventDefault();
     setError("");
-    if (form.answer === "") return setError("Pick which option is correct");
+    setSaved("");
+    if (skipped < 0) return setError("Correct + incorrect can't be more than the total");
     try {
-      const mcq = await api("/mcqs", "POST", { ...form, answer: Number(form.answer) });
-      setMcqs([mcq, ...mcqs]);
-      setForm({ ...emptyQuestion, tracker: form.tracker }); // keep the subject for the next question
+      await api("/mcqs", "POST", {
+        tracker: form.tracker,
+        date: new Date(form.date).toISOString(),
+        total, correct, wrong, skipped,
+        marking: mark,
+        note: form.note,
+      });
+      setSaved(`Saved: ${correct}/${total} correct, ${wrong} incorrect, ${skipped} skipped.`);
+      setForm({ ...emptyForm(), tracker: form.tracker, marking: form.marking }); // keep subject & marking
+      load();
     } catch (err) {
       setError(err.message);
     }
   };
 
-  const removeQuestion = async (id) => {
+  const remove = async (id) => {
+    if (!confirm("Delete this entry?")) return;
     await api(`/mcqs/${id}`, "DELETE");
-    setMcqs(mcqs.filter((m) => m._id !== id));
+    load();
   };
 
-  // ---- start a test ----
-  const pool = mcqs.filter((m) => !setup.tracker || m.tracker?._id === setup.tracker);
+  if (!data) return <div className="empty">Loading…</div>;
 
-  const startTest = () => {
-    const count = setup.count === "all" ? pool.length : Number(setup.count);
-    setTest(shuffle(pool).slice(0, count));
-  };
-
-  const endTest = () => {
-    setTest(null);
-    loadResults();
-  };
-
-  if (test) return <McqTest questions={test} marking={MARKING[setup.marking]} onExit={endTest} />;
+  const logs = data.logs.filter((l) => !subject || (subject === "none" ? !l.tracker : l.tracker?._id === subject));
+  const shown = subject ? data.bySubject.find((s) => (s.tracker?._id || "none") === subject) : data.overall;
+  const o = shown || { logs: 0, total: 0, correct: 0, wrong: 0, skipped: 0, accuracy: 0, scorePercent: 0 };
 
   return (
     <>
       <div className="page-head">
         <div>
           <h1>MCQ practice</h1>
-          <p>Add your own questions, take tests with real exam marking, and track your accuracy.</p>
+          <p>Log the MCQs you solved: how many, when, and how many were correct, incorrect or skipped.</p>
         </div>
         <div className="tabs">
-          {[["practice", "📝 Practice"], ["questions", `📚 My questions (${mcqs.length})`], ["results", "📈 Results"]].map(([key, label]) => (
+          {[["log", "📝 Log MCQs"], ["results", `📈 Results (${data.logs.length})`]].map(([key, label]) => (
             <button key={key} className={tab === key ? "on" : ""} onClick={() => setTab(key)}>{label}</button>
           ))}
         </div>
       </div>
 
-      {tab === "practice" && (
-        <div className="card stack">
-          <h2>Start a test</h2>
+      {tab === "log" && (
+        <form className="card stack" onSubmit={save}>
+          <h2>Add MCQ practice</h2>
           <div className="inline-form">
-            <div style={{ flex: 1 }}>
-              <label>Subject</label>
-              <select value={setup.tracker} onChange={(e) => setSetup({ ...setup, tracker: e.target.value })}>
-                <option value="">All subjects</option>
-                {trackers.map((t) => <option key={t._id} value={t._id}>{t.name}</option>)}
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <label>Questions</label>
-              <select value={setup.count} onChange={(e) => setSetup({ ...setup, count: e.target.value })}>
-                {[5, 10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
-                <option value="all">All</option>
-              </select>
-            </div>
             <div style={{ flex: 2 }}>
-              <label>Marking scheme</label>
-              <select value={setup.marking} onChange={(e) => setSetup({ ...setup, marking: Number(e.target.value) })}>
-                {MARKING.map((m, i) => <option key={m.name} value={i}>{m.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <small>{pool.length} question(s) available for this subject.</small>
-          <div className="actions">
-            <button className="btn" onClick={startTest} disabled={!pool.length}>Start test</button>
-            {!pool.length && <button className="btn-ghost" onClick={() => setTab("questions")}>Add questions first</button>}
-          </div>
-        </div>
-      )}
-
-      {tab === "questions" && (
-        <>
-          <form className="card stack" onSubmit={addQuestion}>
-            <h2>Add a question</h2>
-            <textarea className="textarea" placeholder="Type the question…" required rows={3}
-              value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} />
-            {form.options.map((opt, i) => (
-              <label key={i} className="option-input">
-                <input type="radio" name="answer" checked={form.answer === i} onChange={() => setForm({ ...form, answer: i })} title="Mark as correct" />
-                <b>{LETTERS[i]}</b>
-                <input placeholder={`Option ${LETTERS[i]}`} required value={opt} onChange={(e) => setOption(i, e.target.value)} />
-              </label>
-            ))}
-            <small>Tick the circle next to the correct option.</small>
-            <div className="inline-form">
-              <select value={form.tracker} onChange={(e) => setForm({ ...form, tracker: e.target.value })}>
+              <label>Subject</label>
+              <select value={form.tracker} onChange={set("tracker")}>
                 <option value="">No subject</option>
                 {trackers.map((t) => <option key={t._id} value={t._id}>{t.name}</option>)}
               </select>
-              <input placeholder="Explanation (optional, shown after the test)" value={form.explanation}
-                onChange={(e) => setForm({ ...form, explanation: e.target.value })} />
             </div>
-            {error && <div className="error">{error}</div>}
-            <button className="btn">Save question</button>
-          </form>
+            <div style={{ flex: 2 }}>
+              <label>Date & time</label>
+              <input type="datetime-local" required value={form.date} max={nowLocalInput()} onChange={set("date")} />
+            </div>
+          </div>
+          <div className="inline-form">
+            <div style={{ flex: 1 }}>
+              <label>Total MCQs</label>
+              <input type="number" min="1" required placeholder="e.g. 50" value={form.total} onChange={set("total")} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label>Correct</label>
+              <input type="number" min="0" required placeholder="0" value={form.correct} onChange={set("correct")} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label>Incorrect</label>
+              <input type="number" min="0" required placeholder="0" value={form.wrong} onChange={set("wrong")} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label>Skipped</label>
+              <input value={total ? skipped : ""} readOnly placeholder="auto" className={skipped < 0 ? "late" : ""} />
+            </div>
+          </div>
+          <div className="inline-form">
+            <div style={{ flex: 2 }}>
+              <label>Marking scheme</label>
+              <select value={form.marking} onChange={(e) => setForm({ ...form, marking: Number(e.target.value) })}>
+                {MARKING.map((m, i) => <option key={m.name} value={i}>{m.name}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 2 }}>
+              <label>Note (optional)</label>
+              <input placeholder="e.g. Chapter 4 mock, Marrow QBank" value={form.note} onChange={set("note")} />
+            </div>
+          </div>
+
+          {total > 0 && skipped >= 0 && (
+            <div className="kpis">
+              <div className="kpi"><small>Score</small><strong>{fmt(score)} / {total * mark.correct}</strong></div>
+              <div className="kpi"><small>Correct</small><strong>{correct}</strong></div>
+              <div className="kpi"><small>Attempted</small><strong>{correct + wrong}</strong></div>
+              <div className="kpi"><small>Incorrect</small><strong>{wrong}</strong></div>
+              <div className="kpi"><small>Skipped</small><strong>{skipped}</strong></div>
+              <div className="kpi"><small>Accuracy</small><strong>{pct(correct, correct + wrong)}%</strong></div>
+            </div>
+          )}
+
+          {error && <div className="error">{error}</div>}
+          {saved && <div className="alert completed">✅ {saved}</div>}
+          <div className="actions">
+            <button className="btn">Save</button>
+            {saved && <button type="button" className="btn-ghost" onClick={() => setTab("results")}>See results</button>}
+          </div>
+        </form>
+      )}
+
+      {tab === "results" && (
+        <>
+          <div className="card actions">
+            <label style={{ margin: 0 }}>Subject</label>
+            <select value={subject} onChange={(e) => setSubject(e.target.value)}>
+              <option value="">All subjects</option>
+              {data.bySubject.map((s) => (
+                <option key={s.tracker?._id || "none"} value={s.tracker?._id || "none"}>{s.tracker?.name || "No subject"}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="kpis">
+            <div className="kpi"><small>Total MCQs</small><strong>{o.total}</strong></div>
+            <div className="kpi"><small>Correct</small><strong>{o.correct}</strong></div>
+            <div className="kpi"><small>Entries</small><strong>{o.logs}</strong></div>
+            <div className="kpi"><small>Incorrect</small><strong>{o.wrong}</strong></div>
+            <div className="kpi"><small>Skipped</small><strong>{o.skipped}</strong></div>
+            <div className="kpi"><small>Accuracy</small><strong>{o.accuracy}%</strong></div>
+          </div>
 
           <div className="card">
-            <h2>Question bank</h2>
-            {mcqs.length ? (
+            <h2>By subject</h2>
+            {data.bySubject.length ? (
               <table>
-                <thead><tr><th>Question</th><th>Answer</th><th>Subject</th><th /></tr></thead>
+                <thead>
+                  <tr><th>Subject</th><th>Total</th><th>✓ Correct</th><th>✗ Incorrect</th><th>– Skipped</th><th>Accuracy</th><th>Score</th></tr>
+                </thead>
                 <tbody>
-                  {mcqs.map((m) => (
-                    <tr key={m._id}>
-                      <td>{m.question}</td>
-                      <td>{LETTERS[m.answer]}. {m.options[m.answer]}</td>
-                      <td>{m.tracker?.name || "—"}</td>
-                      <td><button className="btn-small btn-danger" onClick={() => removeQuestion(m._id)}>✕</button></td>
+                  {data.bySubject.map((s) => (
+                    <tr key={s.tracker?._id || "none"}>
+                      <td>{s.tracker && <span className="dot" style={{ background: s.tracker.color }} />} {s.tracker?.name || "No subject"}</td>
+                      <td>{s.total}</td>
+                      <td>{s.correct}</td>
+                      <td>{s.wrong}</td>
+                      <td>{s.skipped}</td>
+                      <td><strong>{s.accuracy}%</strong></td>
+                      <td>{s.scorePercent}%</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            ) : <p className="empty">No questions yet.</p>}
-          </div>
-        </>
-      )}
-
-      {tab === "results" && results && (
-        <>
-          <div className="kpis">
-            <div className="kpi"><small>Tests taken</small><strong>{results.overall.tests}</strong></div>
-            <div className="kpi"><small>Correct</small><strong>{results.overall.correct}</strong></div>
-            <div className="kpi"><small>Questions</small><strong>{results.overall.questions}</strong></div>
-            <div className="kpi"><small>Wrong</small><strong>{results.overall.wrong}</strong></div>
-            <div className="kpi"><small>Accuracy</small><strong>{results.overall.accuracy}%</strong></div>
-            <div className="kpi"><small>Avg score</small><strong>{results.overall.avgPercent}%</strong></div>
+            ) : <p className="empty">Nothing logged yet. Add your first entry from the Log MCQs tab.</p>}
           </div>
 
           <div className="grid">
             <div className="card">
-              <h2>Score trend</h2>
+              <h2>Accuracy trend</h2>
               <Chart type="line" unit="%"
-                data={[...results.attempts].reverse().map((a, i) => ({
-                  name: `T${i + 1}`,
-                  value: a.maxScore ? Math.round((a.score / a.maxScore) * 100) : 0,
+                data={[...logs].reverse().map((l) => ({
+                  name: new Date(l.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+                  value: pct(l.correct, l.correct + l.wrong),
                 }))} />
             </div>
             <div className="card">
               <h2>All answers</h2>
               <Chart type="pie" data={[
-                { name: "Correct", value: results.overall.correct },
-                { name: "Wrong", value: results.overall.wrong },
-                { name: "Not attempted", value: results.overall.skipped },
+                { name: "Correct", value: o.correct },
+                { name: "Incorrect", value: o.wrong },
+                { name: "Skipped", value: o.skipped },
               ]} />
             </div>
           </div>
 
           <div className="card">
-            <h2>Test history</h2>
-            {results.attempts.length ? (
+            <h2>History</h2>
+            {logs.length ? (
               <table>
-                <thead><tr><th>Date</th><th>Marking</th><th>✓</th><th>✗</th><th>–</th><th>Score</th></tr></thead>
+                <thead>
+                  <tr><th>Date & time</th><th>Subject</th><th>Total</th><th>✓</th><th>✗</th><th>–</th><th>Accuracy</th><th>Score</th><th /></tr>
+                </thead>
                 <tbody>
-                  {results.attempts.map((a) => (
-                    <tr key={a._id}>
-                      <td>{formatDate(a.createdAt)}</td>
-                      <td>{a.marking?.name}</td>
-                      <td>{a.correct}</td>
-                      <td>{a.wrong}</td>
-                      <td>{a.skipped}</td>
-                      <td><strong>{+a.score.toFixed(2)}</strong> / {a.maxScore}</td>
+                  {logs.map((l) => (
+                    <tr key={l._id}>
+                      <td>{formatDateTime(l.date)}{l.note && <><br /><small>{l.note}</small></>}</td>
+                      <td>{l.tracker?.name || "—"}</td>
+                      <td>{l.total}</td>
+                      <td>{l.correct}</td>
+                      <td>{l.wrong}</td>
+                      <td>{l.skipped}</td>
+                      <td>{pct(l.correct, l.correct + l.wrong)}%</td>
+                      <td><strong>{fmt(l.score)}</strong> / {l.maxScore}</td>
+                      <td><button className="btn-small btn-danger" onClick={() => remove(l._id)}>✕</button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            ) : <p className="empty">No tests yet. Take one from the Practice tab.</p>}
+            ) : <p className="empty">No entries yet.</p>}
           </div>
         </>
       )}

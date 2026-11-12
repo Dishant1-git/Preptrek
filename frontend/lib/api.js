@@ -31,3 +31,14 @@ export async function api(path, method = "GET", body) {
 
 export const formatDate = (d) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+export const formatTime = (d) => new Date(d).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+
+export const formatDateTime = (d) => (d ? `${formatDate(d)}, ${formatTime(d)}` : "—");
+
+// Current local time in the "YYYY-MM-DDTHH:mm" format a datetime-local input wants
+export const nowLocalInput = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};

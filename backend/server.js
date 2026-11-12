@@ -45,6 +45,8 @@ app.use("/api/sessions", require("./routes/sessions"));
 app.use("/api/targets", require("./routes/targets"));
 app.use("/api/stats", require("./routes/stats"));
 app.use("/api/mcqs", require("./routes/mcqs"));
+app.use("/api/flashcards", require("./routes/flashcards"));
+app.use("/api/timeline", require("./routes/timeline"));
 
 app.get("/", (req, res) => res.send("PrepTrek API is running"));
 
